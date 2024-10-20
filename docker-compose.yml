@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  postgres_authen:
+    image: postgres:14
+    container_name: postgres_authen
+    volumes:
+      - authen_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: authen_service_db
+      POSTGRES_USER: authen_service_user
+      POSTGRES_PASSWORD: authen_service_password
+    ports:
+      - "5432:5432"
+
+  chat_postgres:
+    image: postgres:14
+    container_name: chat_postgres
+    volumes:
+      - chat_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: chat_service_db
+      POSTGRES_USER: chat_service_user
+      POSTGRES_PASSWORD: chat_service_password
+    ports:
+      - "5433:5432"
+
+  authen-service-1:
+    container_name: authen-service-1
+    build:
+      context: ./authenService
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./authenService:/app
+    depends_on:
+      - postgres_authen
+      - service-discovery
+      - api-gateway
+    environment:
+      - DJANGO_SETTINGS_MODULE=authenService.settings
+      - DATABASE_URL=postgres://authen_service_user:authen_service_password@postgres_authen:5432/authen_service_db
+      - SERVICE_TYPE=authen
+      - PORT=8000
+      - SLEEP_DURATION_S=10
+      - SD_URL=http://service-discovery:8080/register
+    ports:
+      - "8000:8000"
+
+  authen-service-2:
+    container_name: authen-service-2
+    build:
+      context: ./authenService
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./authenService:/app
+    depends_on:
+      - postgres_authen
+      - service-discovery
+      - api-gateway
+    environment:
+      - DJANGO_SETTINGS_MODULE=authenService.settings
+      - DATABASE_URL=postgres://authen_service_user:authen_service_password@postgres_authen:5432/authen_service_db
+      - SERVICE_TYPE=authen
+      - PORT=8001
+      - SLEEP_DURATION_S=10
+      - SD_URL=http://service-discovery:8080/register
+    ports:
+      - "8001:8000"
+
+  authen-service-3:
+    container_name: authen-service-3
+    build:
+      context: ./authenService
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./authenService:/app
+    depends_on:
+      - postgres_authen
+      - service-discovery
+      - api-gateway
+    environment:
+      - DJANGO_SETTINGS_MODULE=authenService.settings
+      - DATABASE_URL=postgres://authen_service_user:authen_service_password@postgres_authen:5432/authen_service_db
+      - SERVICE_TYPE=authen
+      - PORT=8002
+      - SLEEP_DURATION_S=10
+      - SD_URL=http://service-discovery:8080/register
+    ports:
+      - "8002:8000"
+
+  chat-service-1:
+    container_name: chat-service-1
+    build:
+      context: ./chatService
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./chatService:/app
+    depends_on:
+      - chat_postgres
+      - service-discovery
+      - api-gateway
+    environment:
+      - DJANGO_SETTINGS_MODULE=chatService.settings
+      - DATABASE_URL=postgres://chat_service_user:chat_service_password@chat_postgres:5432/chat_service_db
+      - SERVICE_TYPE=chat
+      - PORT=8003
+      - SLEEP_DURATION_S=10
+      - SD_URL=http://service-discovery:8080/register
+      - GW_BASE_URL=http://api-gateway:8080/
+    ports:
+      - "8003:8000"
+
+  chat-service-2:
+    container_name: chat-service-2
+    build:
+      context: ./chatService
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./chatService:/app
+    depends_on:
+      - chat_postgres
+      - service-discovery
+      - api-gateway
+    environment:
+      - DJANGO_SETTINGS_MODULE=chatService.settings
+      - DATABASE_URL=postgres://chat_service_user:chat_service_password@chat_postgres:5432/chat_service_db
+      - SERVICE_TYPE=chat
+      - PORT=8004
+      - SLEEP_DURATION_S=10
+      - SD_URL=http://service-discovery:8080/register
+      - GW_BASE_URL=http://api-gateway:8080/
+    ports:
+      - "8004:8000"
+
+  chat-service-3:
+    container_name: chat-service-3
+    build:
+      context: ./chatService
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./chatService:/app
+    depends_on:
+      - chat_postgres
+      - service-discovery
+      - api-gateway
+    environment:
+      - DJANGO_SETTINGS_MODULE=chatService.settings
+      - DATABASE_URL=postgres://chat_service_user:chat_service_password@chat_postgres:5432/chat_service_db
+      - SERVICE_TYPE=chat
+      - PORT=8005
+      - SLEEP_DURATION_S=10
+      - SD_URL=http://service-discovery:8080/register
+      - GW_BASE_URL=http://api-gateway:8080/
+    ports:
+      - "8005:8000"
+
+  sm_redis:
+    image: redis:latest
+    container_name: sm_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
+
+  service-discovery:
+    container_name: service-discovery
+    build:
+      context: ./serviceDiscovery
+    environment:
+      - EXTERNAL_PORT=8081
+      - INTERNAL_PORT=8080
+      - SM_REDIS_URL=redis://sm_redis:6379      
+    ports:
+      - "8081:8080"
+    depends_on:
+      - sm_redis
+
+  api-gateway:
+    container_name: api-gateway
+    build:
+      context: ./apiGateway
+    environment:
+      - EXTERNAL_PORT=8080
+      - INTERNAL_PORT=8080
+      - TIMEOUT_MS=6000
+      - TASK_LIMIT_PER_SERVICE=1
+      - LOAD_THRESHOLD_PER_S_PER_SERVICE=4
+      - MAX_TIMEOUTS=3
+      - SM_REDIS_URL=redis://sm_redis:6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      - sm_redis
+
+volumes:
+  authen_postgres_data:
+  chat_postgres_data:
