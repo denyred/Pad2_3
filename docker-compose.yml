@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: authen_service_user
       POSTGRES_PASSWORD: authen_service_password
     ports:
-      - "5432:5432"
+      - "5434:5432"
 
   chat_postgres:
     image: postgres:14
@@ -41,7 +41,7 @@ services:
       - DATABASE_URL=postgres://authen_service_user:authen_service_password@postgres_authen:5432/authen_service_db
       - SERVICE_TYPE=authen
       - PORT=8000
-      - SLEEP_DURATION_S=10
+      - SLEEP_DURATION_S=20
       - SD_URL=http://service-discovery:8080/register
     ports:
       - "8000:8000"
@@ -62,7 +62,7 @@ services:
       - DATABASE_URL=postgres://authen_service_user:authen_service_password@postgres_authen:5432/authen_service_db
       - SERVICE_TYPE=authen
       - PORT=8001
-      - SLEEP_DURATION_S=10
+      - SLEEP_DURATION_S=20
       - SD_URL=http://service-discovery:8080/register
     ports:
       - "8001:8000"
@@ -83,7 +83,7 @@ services:
       - DATABASE_URL=postgres://authen_service_user:authen_service_password@postgres_authen:5432/authen_service_db
       - SERVICE_TYPE=authen
       - PORT=8002
-      - SLEEP_DURATION_S=10
+      - SLEEP_DURATION_S=20
       - SD_URL=http://service-discovery:8080/register
     ports:
       - "8002:8000"

@@ -346,8 +346,3 @@ Test are written for the authenService to run them:
         api-gateway        | ALERT: Load on authen [172.18.0.10] has exceeded 4 req/s
         authen-service-3   | 172.18.0.6 - - [24/Oct/2024:16:31:20 +0000] "GET /utilities/status HTTP/1.1" 202 79 "-" "PostmanRuntime/7.42.0"
 
-### 10.
-
-1. Is not done.
-
-2. Is not done.

@@ -30,7 +30,9 @@ async function limitTasks(serviceType, ip) {
     const taskKey = `tasks:${ip}`;
     const currentTasks = await redisClient.get(taskKey);
 
-    if (currentTasks && parseInt(currentTasks) >= TASK_LIMIT_PER_SERVICE) {
+    console.log(`${ip}:${currentTasks}`);
+
+    if (currentTasks && parseInt(currentTasks) >= TASK_LIMIT_PER_SERVICE - 1) {
         throw new Error('Task limit reached');
     }
 
