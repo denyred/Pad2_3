@@ -1,0 +1,505 @@
+{
+	"info": {
+		"_postman_id": "d5ba5974-5b13-40c4-9faa-48328b12d6eb",
+		"name": "HTTP Testing",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "29828822",
+		"_collection_link": "https://interstellar-flare-488505.postman.co/workspace/Barber-API~3903e485-13d0-49a4-9100-76c9bef56f38/collection/29828822-d5ba5974-5b13-40c4-9faa-48328b12d6eb?action=share&source=collection_link&creator=29828822"
+	},
+	"item": [
+		{
+			"name": "authenService",
+			"item": [
+				{
+					"name": "Users",
+					"item": [
+						{
+							"name": "List All",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{authen_base_url}}users/list/all",
+									"host": [
+										"{{authen_base_url}}users"
+									],
+									"path": [
+										"list",
+										"all"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "List Employee",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{authen_base_url}}users/list/employee",
+									"host": [
+										"{{authen_base_url}}users"
+									],
+									"path": [
+										"list",
+										"employee"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Patch Rating",
+							"request": {
+								"method": "PATCH",
+								"header": [],
+								"url": {
+									"raw": "{{authen_base_url}}users/patch/rating?user_id=2&new_rating=4.5",
+									"host": [
+										"{{authen_base_url}}users"
+									],
+									"path": [
+										"patch",
+										"rating"
+									],
+									"query": [
+										{
+											"key": "user_id",
+											"value": "2"
+										},
+										{
+											"key": "new_rating",
+											"value": "4.5"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{authen_base_url}}users/delete/999",
+									"host": [
+										"{{authen_base_url}}users"
+									],
+									"path": [
+										"delete",
+										"999"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Utilities",
+					"item": [
+						{
+							"name": "Status",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{authen_base_url}}utilities/status",
+									"host": [
+										"{{authen_base_url}}utilities"
+									],
+									"path": [
+										"status"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Sleepy",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{authen_base_url}}utilities/sleepy",
+									"host": [
+										"{{authen_base_url}}utilities"
+									],
+									"path": [
+										"sleepy"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Check Id",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{authen_base_url}}utilities/check?user_id={{user_id}}",
+									"host": [
+										"{{authen_base_url}}utilities"
+									],
+									"path": [
+										"check"
+									],
+									"query": [
+										{
+											"key": "user_id",
+											"value": "{{user_id}}"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Authen",
+					"item": [
+						{
+							"name": "Sign Up",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"username\": \"employee2\",\r\n    \"password\": \"e2pass\",\r\n    \"first_name\": \"John\",\r\n    \"last_name\": \"Doe\",\r\n    \"user_type\": \"employee\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{authen_base_url}}authen/signup",
+									"host": [
+										"{{authen_base_url}}authen"
+									],
+									"path": [
+										"signup"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Sign In",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"const responseData = pm.response.json();\r",
+											"pm.globals.set(\"user_id\", responseData.user_id);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"username\": \"employee2\",\r\n    \"password\": \"e2pass\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{authen_base_url}}authen/signin",
+									"host": [
+										"{{authen_base_url}}authen"
+									],
+									"path": [
+										"signin"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "chatService",
+			"item": [
+				{
+					"name": "Chats",
+					"item": [
+						{
+							"name": "List All",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{chat_base_url}}chats/list/all",
+									"host": [
+										"{{chat_base_url}}chats"
+									],
+									"path": [
+										"list",
+										"all"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "List My",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "X-User",
+										"value": "{{user_id}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{chat_base_url}}chats/list/my",
+									"host": [
+										"{{chat_base_url}}chats"
+									],
+									"path": [
+										"list",
+										"my"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{chat_base_url}}chats/delete/14",
+									"host": [
+										"{{chat_base_url}}chats"
+									],
+									"path": [
+										"delete",
+										"14"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Start",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"const responseData = pm.response.json();\r",
+											"pm.globals.set(\"connect_url\", responseData.connect_url);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-User",
+										"value": "2",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{chat_base_url}}chats/start?employee_id=3",
+									"host": [
+										"{{chat_base_url}}chats"
+									],
+									"path": [
+										"start"
+									],
+									"query": [
+										{
+											"key": "employee_id",
+											"value": "3"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Connect",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"const responseData = pm.response.json();\r",
+											"pm.globals.set(\"connect_url\", responseData[0].connect_url);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{chat_base_url}}chats/connect?id=1",
+									"host": [
+										"{{chat_base_url}}chats"
+									],
+									"path": [
+										"connect"
+									],
+									"query": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Utilities",
+					"item": [
+						{
+							"name": "Status",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{chat_base_url}}utilities/status",
+									"host": [
+										"{{chat_base_url}}utilities"
+									],
+									"path": [
+										"status"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "API Gateway",
+			"item": [
+				{
+					"name": "Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_base_url}}status",
+							"host": [
+								"{{gateway_base_url}}status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Service Discovery",
+			"item": [
+				{
+					"name": "Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{sd_base_url}}status",
+							"host": [
+								"{{sd_base_url}}status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "authen_base_url",
+			"value": "http://127.0.0.1:8000/",
+			"type": "string"
+		},
+		{
+			"key": "chat_base_url",
+			"value": "http://127.0.0.1:8001/",
+			"type": "string"
+		},
+		{
+			"key": "gateway_base_url",
+			"value": "http://127.0.0.1:8080/",
+			"type": "string"
+		},
+		{
+			"key": "sd_base_url",
+			"value": "http://127.0.0.1:8081/",
+			"type": "string"
+		}
+	]
+}

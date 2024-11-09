@@ -4,27 +4,27 @@ Documented design and implementation of a barber appointment app.
 
 **In order to run the app**, have Docker installed on your machine and execute the following command:
 ```
-docker compose up --build
+docker-compose up --build
 ```
 
-## Architecture
+## Architecture (UPDATED)
 
 ![Architecture](./barber_arch.png)
+
+Main Components:
 
 - **AuthenService** - user data handling (reading/writing)
 - **ChatService** - async chats (Django Channels), requests Authen for user data (names in chats, etc.)
 - **ServiceDiscovery** - registers instances of services (saves IPs in **ServiceMetadata**)
 - **API Gateway** - infrastructure performing load balancing (rr), task/rate limiting and circuit breaking
 
-\* All the data exchanged is in JSON format.
+## Lab 1 Tasks
 
-## Tasks
-
-### 1
+### 1.
 
 Cogito, ergo sum.
 
-### 2.
+### 2. (the endpoints are listed in the order of an optimized user flow)
 
 **AuthenService** - manages user records, main endpoints:
 
@@ -94,35 +94,31 @@ Cogito, ergo sum.
 
 2. Timeouts:
 
-    Timeouts are implemented on the gateway level:
+    Timeouts are implemented on the gateway level and are handled as 'ECONNABORTED' error returned by axios.
 
     ```JavaScript
     app.all('/chat/*', async (req, res) => {
         ...
         try {
-            ...
-            const response = await axios({
-                method: req.method,
-                url: url,
-                data: req.body,
-                headers: req.headers,
-                timeout: TIMEOUT_MS
-            });
+            const response = await axios(
+                {
+                    ...
+                    timeout: TIMEOUT_MS
+                }
+            );
             ...
         } catch (error) {
             ...
             if (error.code === 'ECONNABORTED') {
-                if (ip) await handleCircuitBreaker('chat', ip);
                 res.status(504).send({ detail: `Request passed to ${ip} has timed out.` });
             }
             ...
-        } finally {
-            ...
         }
+        ...
     });
     ```
 
-    You can adjust it by changing `TIMEOUT_MS` env. var. in the docker-compose.api-gateway.
+    You can configure it by adjusting `TIMEOUT_MS` env. var. in the docker-compose.api-gateway.
 
 ### 4.
 
@@ -135,7 +131,7 @@ Cogito, ergo sum.
         const taskKey = `tasks:${ip}`;
         const currentTasks = await redisClient.get(taskKey);
 
-        if (currentTasks && parseInt(currentTasks) >= MAX_TASKS) {
+        if (currentTasks && parseInt(currentTasks) >= TASK_LIMIT_PER_SERVICE) {
             throw new Error('Task limit reached');
         }
 
@@ -144,31 +140,36 @@ Cogito, ergo sum.
     }
     ```
 
-**To test this**, call Sleepy 1, Sleepy 2, Sleepy 3, and Status requests simultaneously in Postman. For the Status request, you should receive a message indicating that the instance of authenService that processed Sleepy 1 is too busy to handle another request. You may need to increase the TIMEOUT_MS environment variable to 9000 and reduce TASK_LIMIT_PER_SERVICE to 1 in docker-compose.api-gateway.
+    Then this value is decremented in the finally block of the main try in the route.
+
+**To test this**, call Sleepy and then start spamming Status requests in Postman. For the third Status request, you should receive a message indicating that the instance of authenService that processes the Sleepy is too busy to handle another request. You may need to increase the TIMEOUT_MS environment variable to 9000 and reduce TASK_LIMIT_PER_SERVICE to 1 in docker-compose.api-gateway.
 
 ### 5.
 
 1. API Gateway is implemented in Express and its main functionality is to pass requests to service specified in urls: /authen/* for authenService and /chat/* for chatService.
 
     ```JavaScript
-    app.all('...', async (req, res) => {
-        try {
-            ...
-            const url = `http://${ip}:${SERVICE_REST_PORT}/${enpoint}`;
-            const response = await axios({
-                method: req.method,
-                url: url,
-                data: req.body,
-                headers: req.headers,
-                timeout: TIMEOUT_MS
-            });
+    app.all('/authen/*', async(req, res) => {
+        let ip;
+        // Getting ip and running middlewares ...
 
+        const endpoint = req.url.replace('/authen/', '');
+        const url = `http://${ip}:${SERVICE_REST_PORT}/${endpoint}`;
+        const reqData = {
+            method: req.method,
+            url: url,
+            data: req.body,
+            headers: req.headers,
+            timeout: TIMEOUT_MS
+        };
+
+        ...
+        try {
+            const response = await axios(reqData);
             res.status(response.status).send(response.data);
-        } catch (error) {
-            ...
-        } finally {
-            ...
+            return;
         }
+        ...
     });
     ```
 
@@ -265,46 +266,102 @@ Cogito, ergo sum.
 
     **To test**, just spam Status request in Postman and you shall receive responses from different services.
 
-2. Circuit Breaker: When a request to a service times out, the gateway increments a counter in Redis using the key 'circuit:${ip}'. If this value does not exist, it is created with a value of 1 and an expiration period of TIMEOUT_MS * 4. If the value does exist, it is simply incremented. If the counter exceeds MAX_TIMEOUTS, the gateway logs a warning.
+2. Circuit Breaker: When a request to a service fails due to a timeout or a 5XX status, it is retried up to three times with the same URL. If a successful response is received during these retries, it is returned. However, if all three attempts fail consecutively, the last error is returned, and the IP of the instance handling the request is removed from the discovery pool.
 
     ```JavaScript
-    async function handleCircuitBreaker(serviceType, ip) {
-        const breakerKey = `circuit:${ip}`;
-
-        // Check the current failure count
-        const currentFailures = await redisClient.get(breakerKey);
-
-        // If the current failure count is null, set it to 1 and define the expiration
-        if (currentFailures === null) {
-            await redisClient.set(breakerKey, 1, 'EX', TIMEOUT_MS * 4); // Set failures to 1 and expire after TIMEOUT_MS * 4
-        } else {
-            await redisClient.incr(breakerKey); // Increment if already set
-        }
-
-        // Check if the current failures exceed the threshold
-        if (currentFailures && parseInt(currentFailures) + 1 >= MAX_TIMOUTS) {
-            console.log(`WARNING: ${ip} has failed to respond in adequate time ${currentFailures + 1} times within ${TIMEOUT_MS * MAX_TIMOUTS} ms`);
-        }
+    // Helper for removing ip from discovered
+    async function removeIpFromDiscovered(serviceType, ip) {
+        const redisKey = `services:${serviceType}`;
+        await redisClient.lRem(redisKey, 0, ip);
     }
+
+    // Route for authenService
+    app.all('/authen/*', async(req, res) => {
+        // Getting ip, running middlewares, and compiling req. data
+
+        try {
+            for (let attempt = 0; attempt <= MAX_FAILURES; attempt++) {
+                try {
+                    const response = await axios(reqData);
+                    res.status(response.status).send(response.data);
+                    return;
+                } catch (error) {
+                    console.error(`Attempt ${attempt + 1} - Error on requesting ${req.method} ${url}:`, error.message);
+
+                    if (error.response && error.response.status >= 400 && error.response.status < 500) {
+                        res.status(error.response.status).json(error.response.data);
+                        return;
+                    }
+
+                    const shouldRetry = 
+                        // Retry on connection timeout
+                        (error.code === 'ECONNABORTED') || 
+                        // Retry on 5XX server errors 
+                        (error.response && error.response.status >= 500 && error.response.status < 600);
+
+                    if (attempt === MAX_FAILURES || !shouldRetry)
+                    {
+                        if (error.code === 'ECONNABORTED') {
+                            res.status(504).send({ 
+                                detail: `Request passed to ${ip} has timed out.`
+                            });
+                        } else {
+                            // Extract details from the error response if it exists
+                            const errorResponse = error.response?.data || { detail: error.message };
+
+                            // Forward the status code and error details from the service
+                            res.status(error.response?.status || 500).json({
+                                ...errorResponse,
+                            });
+                        }
+
+                        // Trip the circuit
+                        await removeIpFromDiscovered('authen', ip);
+                        console.log(`LOG: Tripped the circuit for authenServise at ${ip}`);
+
+                        return;
+                    }
+                }
+            } 
+        } finally {
+            await redisClient.decr(`tasks:${ip}`);
+        }
+    });
     ```
 
-    To test it, just spam Sleepy 1, Sleepy 2, and Sleepy 3 simultaneously until you see alerts in the DOCKER logs:
+    To test it, just run Sleepy and you will see similar logs:
 
-        api-gateway        | Error on /authen: timeout of 6000ms exceeded
-        api-gateway        | ALERT: 172.18.0.9 has failed to respond in adequate time 3 times within 18000 ms
-        ...
-        api-gateway        | Error on /authen: timeout of 6000ms exceeded
-        api-gateway        | ALERT: 172.18.0.10 has failed to respond in adequate time 3 times within 18000 ms
-        ...
-        api-gateway        | Error on /authen: timeout of 6000ms exceeded
-        api-gateway        | ALERT: 172.18.0.8 has failed to respond in adequate time 3 times within 18000 ms
+        api-gateway        | Attempt 1 - Error on requesting GET http://172.18.0.9:8000/utilities/sleepy: timeout of 6000ms exceeded
+        api-gateway        | Attempt 2 - Error on requesting GET http://172.18.0.9:8000/utilities/sleepy: timeout of 6000ms exceeded
+        api-gateway        | Attempt 3 - Error on requesting GET http://172.18.0.9:8000/utilities/sleepy: timeout of 6000ms exceeded
+        api-gateway        | Attempt 4 - Error on requesting GET http://172.18.0.9:8000/utilities/sleepy: timeout of 6000ms exceeded
+        api-gateway        | LOG: Tripped the circuit for authenServise at 172.18.0.9
 
 ### 8.
 
 Test are written for the authenService to run them:
 
-1. Activate the venv and install all the dependencies (authenService/requirements.txt).
-2. Run python manage.py test app_name (app_name={'users', 'authen}) from the root of Django project.
+1. Create a virtual environment
+
+
+        python -m vevn env
+
+2. Activate it
+
+
+        For Linux:   source env/bin/activate
+        For Windows: env\Scripts\activate
+
+3. Install the dependencies
+
+
+        pip install -r authenService/requirements.txt
+
+4. Run the tests
+
+
+        python authenService/manage.py test
+
 
 \* You can find the code for tests in the test.py files.
 
@@ -330,19 +387,32 @@ Test are written for the authenService to run them:
 
         // Check if the current load exceeds the threshold
         if (currentLoad && parseInt(currentLoad) >= LOAD_THRESHOLD_PER_S_PER_SERVICE) {
-            console.log(`ALERT: Load on ${serviceType} [${ip}] has exceeded ${LOAD_THRESHOLD_PER_S_PER_SERVICE} req/s`);
+            console.log(`ALERT: Load on ${serviceType} [${ip}] has exceeded ${LOAD_THRESHOLD_PER_S_PER_SERVICE} req/min`);
         }
     }
     ```
 
-        api-gateway        | ALERT: Load on authen [172.18.0.9] has exceeded 4 req/s
-        authen-service-1   | 172.18.0.6 - - [24/Oct/2024:16:31:16 +0000] "GET /utilities/status HTTP/1.1" 202 79 "-" "PostmanRuntime/7.42.0"
-        api-gateway        | ALERT: Load on authen [172.18.0.10] has exceeded 4 req/s
-        authen-service-3   | 172.18.0.6 - - [24/Oct/2024:16:31:17 +0000] "GET /utilities/status HTTP/1.1" 202 79 "-" "PostmanRuntime/7.42.0"
-        api-gateway        | ALERT: Load on authen [172.18.0.8] has exceeded 4 req/s
-        authen-service-2   | 172.18.0.6 - - [24/Oct/2024:16:31:18 +0000] "GET /utilities/status HTTP/1.1" 202 79 "-" "PostmanRuntime/7.42.0"
-        api-gateway        | ALERT: Load on authen [172.18.0.9] has exceeded 4 req/s
-        authen-service-1   | 172.18.0.6 - - [24/Oct/2024:16:31:19 +0000] "GET /utilities/status HTTP/1.1" 202 79 "-" "PostmanRuntime/7.42.0"
-        api-gateway        | ALERT: Load on authen [172.18.0.10] has exceeded 4 req/s
-        authen-service-3   | 172.18.0.6 - - [24/Oct/2024:16:31:20 +0000] "GET /utilities/status HTTP/1.1" 202 79 "-" "PostmanRuntime/7.42.0"
+    To test it just spam Status and you will see similar logs:
 
+        api-gateway        | ALERT: Load on authen [172.18.0.11] has exceeded 4 req/s
+        api-gateway        | ALERT: Load on authen [172.18.0.8] has exceeded 4 req/s
+        api-gateway        | ALERT: Load on authen [172.18.0.11] has exceeded 4 req/s
+        api-gateway        | ALERT: Load on authen [172.18.0.8] has exceeded 4 req/s
+
+### 10.
+
+1. Is not done.
+
+2. Is not done.
+
+## Lab 2 Tasks
+
+### 0.
+
+In the expanded architecture diagram, I have included components that enable the following functionalities:
+
+* Replication for user data with two dedicated read replicas to distribute query load efficiently.
+* Two-Phase Commit (2PC) and long-running transaction mechanisms, managed by a Transaction Coordinator within the API Gateway, to ensure safe, atomic deletion of user data, including all associated chats.
+* ETL process to collect analytical data, enabling the analysis of each barber's performance.
+* ELK stack logging & analysis to centralize and process logs across all system instances, enhancing monitoring and troubleshooting capabilities.
+* Cache sharding using a Redis cluster to enable sharded caching of user data with consistent hashing, enhancing data access speed and scalability.
