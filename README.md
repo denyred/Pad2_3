@@ -1,4 +1,4 @@
-# Barber App
+# Barber App(Updated)
 
 Documented design and implementation of a barber appointment app.
 
